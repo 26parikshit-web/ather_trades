@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background: radial-gradient(1200px 600px at 20% -10%, #0D1B2A 0%, #0A0A1A 55%, #07070F 100%);
+    font-family: theme('fontFamily.mono');
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0A0A1A;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1B2A3A;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #24405A;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-lg border border-hud-border bg-hud-panel/60 backdrop-blur-sm;
+  }
+
+  .panel-head {
+    @apply flex items-center justify-between border-b border-hud-border px-4 py-2.5
+           text-[11px] uppercase tracking-[0.18em] text-hud-dim;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-hud-border
+           px-3.5 py-2 text-xs uppercase tracking-wider text-hud-text transition-all
+           hover:border-hud-cyan hover:text-hud-cyan disabled:cursor-not-allowed
+           disabled:opacity-40 disabled:hover:border-hud-border disabled:hover:text-hud-text;
+  }
+
+  .btn-primary {
+    @apply border-hud-cyan/60 bg-hud-cyan/10 text-hud-cyan hover:bg-hud-cyan/20 hover:shadow-cyan;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-hud-border bg-hud-bg/80 px-3 py-2 text-sm
+           text-hud-text placeholder-hud-faint outline-none transition-colors
+           focus:border-hud-cyan/60 focus:ring-1 focus:ring-hud-cyan/30;
+  }
+
+  .label {
+    @apply mb-1.5 block text-[10px] uppercase tracking-[0.16em] text-hud-dim;
+  }
+
+  .stat {
+    @apply text-[10px] uppercase tracking-[0.16em] text-hud-faint;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider;
+  }
+}
+
+.font-num {
+  font-variant-numeric: tabular-nums;
+}

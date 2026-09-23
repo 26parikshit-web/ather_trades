@@ -9,3 +9,7 @@ __pycache__/
 supabase-cli/
 supabase/.temp/
 supabase-cli.zip
+
+# frontend build artifacts
+frontend/dist/
+frontend/dev-dist/

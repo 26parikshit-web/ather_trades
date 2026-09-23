@@ -1,6 +1,7 @@
-# ⚡ AETHER Backend — Tactical Market Intelligence
+# ⚡ AETHER — Tactical Market Intelligence
 
-> **Micro-Engine Architecture** | Node.js + TypeScript + Python + Supabase + Redis
+> **Backend:** Node.js + TypeScript + Python FastAPI + Supabase + Redis
+> **Web App:** React 18 + TypeScript + Vite + Tailwind + PWA (`frontend/`)
 > **100% free-tier stack** — Gemini + HuggingFace instead of OpenAI, no paid video APIs
 
 ---
@@ -15,6 +16,7 @@
 | Live market data | **NSE official → RapidAPI (optional) → Yahoo Finance** | Free |
 | Cache | **Redis** (local Docker) — optional, degrades gracefully | Free |
 | Technical indicators / regime / portfolio math | Local **Python FastAPI** | Free |
+| Web dashboard (HUD) | **React + Vite + Tailwind + zustand + lightweight-charts**, installable PWA | Free |
 | Social posting (Reels/YouTube) | ⛔ **Disabled** (Shotstack paid API removed — captions still generated) | — |
 
 ---
@@ -169,6 +171,73 @@ These are **not required** and are disabled by default:
 | Instagram Graph API | ⏸️ Stubbed | Free but needs Meta app review; `instagram_status = 'DISABLED'` |
 | YouTube Data API | ⏸️ Stubbed | Free quota exists; upload code removed for now |
 | RapidAPI NSE | ➕ Optional | Free tier available; app falls back to Yahoo Finance without it |
+
+---
+
+## 🖥️ Web App — `frontend/`
+
+React 18 + TypeScript + Vite + Tailwind CSS v3, installable as a **PWA**.
+Streams live quotes, Oracle signals, news impact, and whale alerts over the
+backend WebSocket — with toast popups as events arrive.
+
+### Pages
+
+| Route | What it does |
+|---|---|
+| `/login` | Signup / sign-in (JWT session in `localStorage`) |
+| `/` | **HUD** — live Nifty/BankNifty/Sensex ticker strip, watchlist with streaming quotes, Oracle tape, News Lightning |
+| `/oracle` | Generate + browse AI Oracle signals (PRO+) |
+| `/news` | Analyzed news feed, impact filter, manual Gemini analysis, feed scanner |
+| `/portfolio` | Holdings with live P&L, add/remove, Gemini AI review |
+| `/stock/:ticker` | Live intraday chart (lightweight-charts), fundamentals, whale/momentum meters, Summon Signal |
+| `/studio` | **ELITE** — signal broadcast cards, manual scans, broadcast logs, admin stats |
+
+### Frontend dev
+
+```bash
+cd frontend
+npm install
+npm run dev          # http://localhost:5173  (proxies /api and /ws → :3000)
+
+npm run typecheck    # tsc --noEmit
+npm run build        # typecheck + vite build → frontend/dist (PWA + sw.js)
+npm run preview      # serve the production build locally
+```
+
+Dev proxy (configured in `vite.config.ts`): `/api` → `http://localhost:3000`,
+`/ws` → `ws://localhost:3000` (so no CORS issues locally).
+
+### Frontend env (`frontend/.env`)
+
+```bash
+VITE_API_URL=      # empty in dev (proxy). Prod: https://your-api.example.com
+VITE_WS_URL=       # prod: wss://your-api.example.com
+```
+
+### Deploy on Vercel
+
+1. Import the repo → set **Root Directory** = `frontend`
+2. Framework preset auto-detects Vite; build `npm run build`, output `dist`
+3. Set env vars `VITE_API_URL` / `VITE_WS_URL` to your deployed backend
+4. On the backend, set `FRONTEND_URL=https://<your-app>.vercel.app` so CORS/WS
+   origin checks allow the app
+
+### Frontend architecture
+
+```
+frontend/src/
+├── lib/api.ts        # fetch client, envelope unwrap, JWT session, 401 auto-logout
+├── lib/ws.ts         # auto-reconnecting WS (backoff, heartbeat, channel subs)
+├── lib/format.ts     # INR / % / compact / time-ago formatters
+├── store/auth.ts     # zustand auth + tier gating (hasTier('PRO'))
+├── store/live.ts     # zustand live store — quotes/signals/news/alerts/toasts
+├── components/       # Layout (sidebar+toasts), Protected, IndexBar, SignalCard, NewsItem
+└── pages/            # Login, Dashboard, Oracle, News, Portfolio, StockDetail, Studio
+```
+
+Verified live: typecheck 0 errors · production build ✓ (71 modules, ~119 KB
+gzip JS + service worker) · dev server + API proxy + `/ws` proxy all confirmed
+against the running backend.
 
 ---
 
