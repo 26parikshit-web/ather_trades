@@ -1,11 +1,8 @@
-// Pulse Studio (ELITE) — social signal cards + broadcast logs + admin stats.
+// Pulse Studio (ELITE) — social signal cards + broadcast logs.
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   broadcastSignal,
-  getAdminStats,
   getBroadcastLogs,
-  runSignalScan,
-  type AdminStats,
   type BroadcastLog,
 } from '../lib/api';
 import { useLive } from '../store/live';
@@ -26,18 +23,11 @@ export default function Studio() {
   const { pushToast } = useLive();
   const [form, setForm] = useState(DEFAULT_FORM);
   const [logs, setLogs] = useState<BroadcastLog[]>([]);
-  const [stats, setStats] = useState<AdminStats | null>(null);
   const [busy, setBusy] = useState(false);
-  const [scanTickers, setScanTickers] = useState('RELIANCE,TCS,INFY,HDFCBANK,ICICIBANK');
 
   const load = async () => {
     try {
       setLogs(await getBroadcastLogs(20));
-    } catch {
-      /* ignore */
-    }
-    try {
-      setStats(await getAdminStats());
     } catch {
       /* ignore */
     }
@@ -57,33 +47,12 @@ export default function Studio() {
       const r = await broadcastSignal(form);
       pushToast({
         kind: 'signal',
-        title: '📣 BROADCAST QUEUED',
+        title: 'BROADCAST QUEUED',
         body: r.note || 'Signal card generated',
       });
       await load();
     } catch (err) {
       pushToast({ kind: 'error', title: 'BROADCAST FAILED', body: (err as Error).message });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const scan = async () => {
-    setBusy(true);
-    try {
-      const tickers = scanTickers
-        .split(',')
-        .map((t) => t.trim().toUpperCase())
-        .filter(Boolean);
-      const sigs = await runSignalScan(tickers);
-      pushToast({
-        kind: 'signal',
-        title: '⌁ SCAN COMPLETE',
-        body: `${sigs.length} signals generated`,
-      });
-      await load();
-    } catch (err) {
-      pushToast({ kind: 'error', title: 'SCAN FAILED', body: (err as Error).message });
     } finally {
       setBusy(false);
     }
@@ -105,34 +74,20 @@ export default function Studio() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-sm font-bold uppercase tracking-[0.25em] text-hud-cyan">
-          📣 Pulse Studio
-        </h1>
+        <div>
+          <h1 className="text-lg font-extrabold tracking-tight text-hud-text">Pulse Studio</h1>
+          <p className="text-[11px] text-hud-faint">
+            Social signal cards + broadcast audit trail
+          </p>
+        </div>
         <span className="chip border-hud-warn/50 bg-hud-warn/10 text-hud-warn">ELITE</span>
       </div>
-
-      {/* stats */}
-      {stats && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            ['WS Clients', String(stats.ws_connected_clients)],
-            ['Uptime', `${Math.floor(stats.uptime_seconds / 60)}m`],
-            ['Memory', `${stats.memory_mb} MB`],
-            ['Posting', stats.free_mode ? 'FREE MODE' : 'SOCIAL'],
-          ].map(([k, v]) => (
-            <div key={k} className="panel p-3.5">
-              <div className="stat">{k}</div>
-              <div className="font-num mt-1 text-lg font-bold">{v}</div>
-            </div>
-          ))}
-        </div>
-      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* broadcast form */}
         <form onSubmit={send} className="panel space-y-3 p-4">
-          <div className="panel-head !border-b-0 !px-0">
-            <span>⌁ Signal Broadcast</span>
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-hud-dim">
+            📣 Compose Broadcast
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="min-w-[130px] flex-1">
@@ -172,29 +127,38 @@ export default function Studio() {
             />
           </div>
           <button className="btn btn-primary w-full" disabled={busy}>
-            {busy ? '⌁ WORKING…' : '📣 BROADCAST SIGNAL'}
-          </button>
-        </form>
-
-        {/* manual scan */}
-        <section className="panel space-y-3 p-4">
-          <div className="panel-head !border-b-0 !px-0">
-            <span>⌁ Manual Signal Scan</span>
-          </div>
-          <div>
-            <label className="label">Tickers (comma separated)</label>
-            <input
-              className="input uppercase"
-              value={scanTickers}
-              onChange={(e) => setScanTickers(e.target.value.toUpperCase())}
-            />
-          </div>
-          <button className="btn btn-primary w-full" onClick={scan} disabled={busy}>
-            {busy ? '⌁ SCANNING…' : '⌁ RUN SCAN (Gemini + HF)'}
+            {busy ? 'Working…' : '📣 Broadcast Signal'}
           </button>
           <p className="text-[11px] leading-relaxed text-hud-faint">
-            Generates Oracle signals for each ticker and stores them in Supabase. Uses the
-            live Gemini + HuggingFace keys from the backend.
+            Free mode: caption + signal card are logged. Social auto-posting is disabled.
+          </p>
+        </form>
+
+        {/* preview */}
+        <section className="panel space-y-3 p-4">
+          <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-hud-dim">
+            ▣ Card Preview
+          </div>
+          <div className="hero-card !p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-extrabold">{form.ticker}</span>
+              <span className="chip border-white/20 bg-white/10 text-white">
+                {form.signal_type}
+              </span>
+            </div>
+            <div className="font-num mt-2 text-3xl font-extrabold">
+              ₹{form.target.toFixed(2)}
+            </div>
+            <div className="mt-1 text-xs text-white/60">
+              Stop ₹{form.stop_loss.toFixed(2)} · conf {form.confidence}% · PE {form.pe} · PB{' '}
+              {form.pb}
+            </div>
+            <p className="mt-3 border-t border-white/10 pt-2 text-[11px] leading-relaxed text-white/70">
+              {form.rationale}
+            </p>
+          </div>
+          <p className="text-[11px] leading-relaxed text-hud-faint">
+            Edit the form to see the generated social card exactly as it will be logged.
           </p>
         </section>
       </div>
@@ -202,16 +166,15 @@ export default function Studio() {
       {/* broadcast logs */}
       <section className="panel overflow-x-auto">
         <div className="panel-head">
-          <span>◈ Broadcast Log</span>
+          <span>Broadcast Log</span>
           <span className="text-hud-faint">{logs.length} entries</span>
         </div>
-        <div className="divide-y divide-hud-border/50">
+        <div className="divide-y divide-hud-border">
           {logs.map((l) => (
             <div key={l.id} className="flex items-start justify-between gap-4 px-4 py-3">
               <div className="min-w-0">
                 <div className="text-[12px] font-bold">
-                  {l.ticker ?? '—'}{' '}
-                  <span className="text-hud-cyan">{l.signal_type ?? ''}</span>
+                  {l.ticker ?? '—'} <span className="text-hud-cyan">{l.signal_type ?? ''}</span>
                 </div>
                 <div className="truncate text-[11px] text-hud-dim">
                   {l.caption || '(no caption)'}
@@ -226,7 +189,7 @@ export default function Studio() {
             </div>
           ))}
           {logs.length === 0 && (
-            <div className="px-4 py-8 text-center text-xs text-hud-faint">
+            <div className="px-4 py-10 text-center text-xs text-hud-faint">
               Nothing broadcast yet — send the first signal above.
             </div>
           )}

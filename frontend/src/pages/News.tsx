@@ -39,11 +39,7 @@ export default function News() {
       const n = await analyzeNews(headline.trim());
       useLive.setState({ news: [n, ...useLive.getState().news] });
       setHeadline('');
-      pushToast({
-        kind: 'news',
-        title: '🧠 ANALYZED',
-        body: `${n.headline.slice(0, 70)}…`,
-      });
+      pushToast({ kind: 'news', title: 'ANALYZED', body: `${n.headline.slice(0, 70)}…` });
     } catch (err) {
       pushToast({ kind: 'error', title: 'ANALYSIS FAILED', body: (err as Error).message });
     } finally {
@@ -57,7 +53,7 @@ export default function News() {
       const { processed } = await scanNews();
       pushToast({
         kind: 'news',
-        title: '📡 SCAN COMPLETE',
+        title: 'SCAN COMPLETE',
         body: `${processed} headlines processed`,
       });
       const list = await getNews(40, minImpact);
@@ -71,12 +67,15 @@ export default function News() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-sm font-bold uppercase tracking-[0.25em] text-hud-cyan">
-          📰 News Lightning
-        </h1>
-        <div className="flex items-center gap-3">
-          <label className="text-[10px] uppercase tracking-widest text-hud-faint">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-extrabold tracking-tight text-hud-text">News Lightning</h1>
+          <p className="text-[11px] text-hud-faint">
+            AI impact analysis · {news.length} headlines
+          </p>
+        </div>
+        <div className="flex items-center gap-3 rounded-full border border-hud-border bg-white px-4 py-2 shadow-[0_1px_2px_rgba(12,31,23,0.05)]">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-hud-faint">
             min impact
           </label>
           <input
@@ -88,7 +87,7 @@ export default function News() {
             onChange={(e) => setMinImpact(Number(e.target.value))}
             className="w-24 accent-hud-cyan"
           />
-          <span className="font-num text-[11px] text-hud-cyan">
+          <span className="font-num text-[11px] font-bold text-hud-cyan">
             {(minImpact * 100).toFixed(0)}%
           </span>
         </div>
@@ -104,11 +103,11 @@ export default function News() {
             onChange={(e) => setHeadline(e.target.value)}
           />
           <button className="btn btn-primary" disabled={busy || !headline.trim()}>
-            🧠 ANALYZE
+            🧠 Analyze
           </button>
         </form>
         <button className="btn" onClick={runScan} disabled={busy}>
-          📡 SCAN FEEDS
+          📡 Scan Feeds
         </button>
       </div>
 
@@ -118,12 +117,12 @@ export default function News() {
           <NewsItem key={n.id} n={n} />
         ))}
         {loading && news.length === 0 && (
-          <div className="panel col-span-full p-8 text-center text-xs text-hud-faint">
-            ⌁ loading analyzed headlines…
+          <div className="panel col-span-full p-10 text-center text-xs text-hud-faint">
+            Loading analyzed headlines…
           </div>
         )}
         {!loading && news.length === 0 && (
-          <div className="panel col-span-full p-8 text-center text-xs text-hud-faint">
+          <div className="panel col-span-full p-10 text-center text-xs text-hud-faint">
             No headlines match this impact filter — lower it or run a scan.
           </div>
         )}

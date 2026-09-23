@@ -11,11 +11,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'AETHER — Tactical Market Intelligence',
+        name: 'AETHER — Neo Market Intelligence',
         short_name: 'AETHER',
-        description: 'Live NSE market HUD, AI signals, and news intelligence',
-        theme_color: '#0A0A1A',
-        background_color: '#0A0A1A',
+        description: 'Neo NSE market dashboard, AI signals, and news intelligence',
+        theme_color: '#EAF7F0',
+        background_color: '#EAF7F0',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

@@ -206,6 +206,21 @@ export function runSignalScan(tickers: string[]): Promise<OracleSignal[]> {
   });
 }
 
+export function runNewsScanAdmin(): Promise<{ processed: number }> {
+  return request<{ processed: number }>('/api/admin/scan/news', { method: 'POST' });
+}
+
+export function triggerDailyRecap(): Promise<{ triggered: boolean }> {
+  return request<{ triggered: boolean }>('/api/admin/broadcast/recap', { method: 'POST' });
+}
+
+export function flushCache(pattern: string): Promise<{ flushed: string }> {
+  return request<{ flushed: string }>('/api/admin/cache/flush', {
+    method: 'POST',
+    body: JSON.stringify({ pattern }),
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  BROADCAST (Pulse Studio)
 // ═══════════════════════════════════════════════════════════════

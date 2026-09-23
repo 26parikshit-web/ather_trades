@@ -5,25 +5,35 @@ export default {
     extend: {
       colors: {
         hud: {
-          bg: '#0A0A1A',
-          panel: '#0D1B2A',
-          border: '#1B2A3A',
-          text: '#E6F1FF',
-          dim: '#8899AA',
-          faint: '#445566',
-          cyan: '#00BFFF',
-          bull: '#00FF88',
-          bear: '#FF4444',
-          warn: '#FFB020',
+          bg: '#EAF7F0',       // mint page background
+          panel: '#FFFFFF',    // cards
+          border: '#DCEDE4',   // hairline borders
+          text: '#0C1F17',     // near-black headings/body
+          dim: '#476156',      // secondary text
+          faint: '#94ACA1',    // muted/placeholder
+          cyan: '#00B865',     // primary emerald (legacy class name kept)
+          bull: '#00A860',     // up / gains
+          bear: '#E5484D',     // down / losses
+          warn: '#F59E0B',     // alerts / watch
+          ink: '#0A1F17',      // dark hero cards
+          mint: '#DCF5E8',     // tinted chips / active nav
         },
       },
       fontFamily: {
-        mono: ['"JetBrains Mono"', '"Courier New"', 'monospace'],
+        mono: [
+          'Inter',
+          'system-ui',
+          '-apple-system',
+          'Segoe UI',
+          'Roboto',
+          'sans-serif',
+        ],
       },
       boxShadow: {
-        bull: '0 0 20px rgba(0,255,136,0.25)',
-        bear: '0 0 20px rgba(255,68,68,0.25)',
-        cyan: '0 0 20px rgba(0,191,255,0.25)',
+        card: '0 1px 2px rgba(12,31,23,0.05), 0 10px 28px -18px rgba(12,31,23,0.25)',
+        bull: '0 8px 20px -10px rgba(0,168,96,0.55)',
+        bear: '0 8px 20px -10px rgba(229,72,77,0.5)',
+        cyan: '0 8px 20px -10px rgba(0,184,101,0.55)',
       },
       animation: {
         'pulse-fast': 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',

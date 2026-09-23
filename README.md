@@ -185,12 +185,16 @@ backend WebSocket — with toast popups as events arrive.
 | Route | What it does |
 |---|---|
 | `/login` | Signup / sign-in (JWT session in `localStorage`) |
-| `/` | **HUD** — live Nifty/BankNifty/Sensex ticker strip, watchlist with streaming quotes, Oracle tape, News Lightning |
+| `/` | **Dashboard** — dark hero Nifty card, live index strip, Top Movers, watchlist with streaming quotes, Oracle tape, News Lightning |
 | `/oracle` | Generate + browse AI Oracle signals (PRO+) |
 | `/news` | Analyzed news feed, impact filter, manual Gemini analysis, feed scanner |
-| `/portfolio` | Holdings with live P&L, add/remove, Gemini AI review |
+| `/portfolio` | Dark hero value card, holdings with live P&L, add/remove, Gemini AI review |
 | `/stock/:ticker` | Live intraday chart (lightweight-charts), fundamentals, whale/momentum meters, Summon Signal |
-| `/studio` | **ELITE** — signal broadcast cards, manual scans, broadcast logs, admin stats |
+| `/studio` | **ELITE** — signal broadcast composer + live card preview, broadcast logs |
+| `/admin` | **ELITE** — admin console: system stats (WS clients, uptime, memory, stack), signal scan, news scan, daily recap trigger, cache flush |
+
+> **Design:** light "Neo" theme — mint background, white rounded cards, emerald
+> primary, dark hero cards, pill buttons, sidebar + mobile bottom-nav.
 
 ### Frontend dev
 

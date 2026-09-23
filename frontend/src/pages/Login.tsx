@@ -1,4 +1,4 @@
-// Login / Signup — one screen, mode toggle.
+// Login / Signup — Neo-style card with mode toggle.
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../store/auth';
@@ -26,15 +26,17 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="text-3xl">⚡</div>
-          <h1 className="mt-2 text-lg font-black tracking-[0.4em] text-hud-cyan">AETHER</h1>
-          <p className="mt-1 text-[11px] uppercase tracking-widest text-hud-faint">
-            Tactical Market Intelligence
+          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-hud-ink text-2xl text-[#00E676] shadow-[0_22px_45px_-22px_rgba(10,31,23,0.85)]">
+            ⚡
+          </span>
+          <h1 className="mt-4 text-xl font-extrabold tracking-[0.3em] text-hud-text">AETHER</h1>
+          <p className="mt-1 text-[11px] font-medium uppercase tracking-widest text-hud-faint">
+            Neo Market Intelligence
           </p>
         </div>
 
-        <form onSubmit={submit} className="panel space-y-4 p-5">
-          <div className="flex rounded-md border border-hud-border text-xs">
+        <form onSubmit={submit} className="panel space-y-4 p-6">
+          <div className="flex rounded-full border border-hud-border bg-hud-bg p-1 text-xs font-semibold">
             {(['login', 'signup'] as const).map((m) => (
               <button
                 key={m}
@@ -43,9 +45,9 @@ export default function Login() {
                   setMode(m);
                   clearError();
                 }}
-                className={`flex-1 rounded-md py-2 uppercase tracking-widest transition-colors ${
+                className={`flex-1 rounded-full py-2 transition-all ${
                   mode === m
-                    ? 'bg-hud-cyan/15 text-hud-cyan'
+                    ? 'bg-hud-ink text-white shadow-card'
                     : 'text-hud-dim hover:text-hud-text'
                 }`}
               >
@@ -56,7 +58,7 @@ export default function Login() {
 
           {mode === 'signup' && (
             <div>
-              <label className="label">Callsign (optional)</label>
+              <label className="label">Name (optional)</label>
               <input
                 className="input"
                 value={name}
@@ -95,22 +97,22 @@ export default function Login() {
           </div>
 
           {error && (
-            <div className="rounded border border-hud-bear/40 bg-hud-bear/10 px-3 py-2 text-[11px] text-hud-bear">
+            <div className="rounded-xl border border-hud-bear/40 bg-hud-bear/10 px-3 py-2 text-[11px] font-medium text-hud-bear">
               {error}
             </div>
           )}
 
           <button
-            className="btn btn-primary w-full !py-2.5"
+            className="btn btn-primary w-full !py-3 text-sm"
             disabled={loading}
             type="submit"
           >
-            {loading ? '⌁ LINKING…' : mode === 'signup' ? 'Create Account →' : 'Enter HUD →'}
+            {loading ? 'Linking…' : mode === 'signup' ? 'Create Account →' : 'Enter Dashboard →'}
           </button>
 
           <p className="text-center text-[10px] text-hud-faint">
-            New accounts start on <span className="text-hud-dim">BASIC</span> · instant
-            access, no email confirm
+            New accounts start on <span className="font-semibold text-hud-dim">BASIC</span> ·
+            instant access, no email confirm
           </p>
         </form>
       </div>

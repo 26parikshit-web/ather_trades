@@ -1,18 +1,13 @@
-// Stock detail — live intraday chart (session-accumulated), fundamentals, Oracle.
+// Stock detail — live intraday chart, fundamentals, Oracle. Neo styling.
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { createChart, type IChartApi, type ISeriesApi, type LineData } from 'lightweight-charts';
 import SignalCard from '../components/SignalCard';
+import TickerIcon from '../components/TickerIcon';
 import { getFundamentals, getSignal } from '../lib/api';
 import { useLive } from '../store/live';
 import { socket } from '../lib/ws';
-import {
-  deltaClass,
-  formatCompact,
-  formatINR,
-  formatNum,
-  formatPct,
-} from '../lib/format';
+import { formatCompact, formatINR, formatNum, formatPct } from '../lib/format';
 import type { LiveQuote, OracleSignal, StockFundamentals } from '../types';
 
 export default function StockDetail() {
@@ -29,7 +24,7 @@ export default function StockDetail() {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // ── load fundamentals + signal
+  // ── load fundamentals
   useEffect(() => {
     let alive = true;
     setFund(null);
@@ -49,28 +44,28 @@ export default function StockDetail() {
     };
   }, [ticker]);
 
-  // ── chart init
+  // ── chart init (light theme)
   useEffect(() => {
     if (!chartEl.current) return;
     const chart = createChart(chartEl.current, {
       height: 300,
       layout: {
         background: { color: 'transparent' },
-        textColor: '#8899AA',
-        fontFamily: '"JetBrains Mono", monospace',
+        textColor: '#476156',
+        fontFamily: 'Inter, system-ui, sans-serif',
       },
       grid: {
-        vertLines: { color: 'rgba(27,42,58,0.5)' },
-        horzLines: { color: 'rgba(27,42,58,0.5)' },
+        vertLines: { color: 'rgba(220,237,228,0.8)' },
+        horzLines: { color: 'rgba(220,237,228,0.8)' },
       },
-      timeScale: { borderColor: '#1B2A3A', timeVisible: true, secondsVisible: false },
-      rightPriceScale: { borderColor: '#1B2A3A' },
+      timeScale: { borderColor: '#DCEDE4', timeVisible: true, secondsVisible: false },
+      rightPriceScale: { borderColor: '#DCEDE4' },
       crosshair: { mode: 0 },
     });
     const series = chart.addAreaSeries({
-      lineColor: '#00BFFF',
-      topColor: 'rgba(0,191,255,0.25)',
-      bottomColor: 'rgba(0,191,255,0.02)',
+      lineColor: '#00B865',
+      topColor: 'rgba(0,184,101,0.28)',
+      bottomColor: 'rgba(0,184,101,0.02)',
       lineWidth: 2,
       priceFormat: { type: 'price', precision: 2, minMove: 0.05 },
     });
@@ -102,27 +97,26 @@ export default function StockDetail() {
       const t = Math.floor(q.timestamp / 1000) as LineData['time'];
       const pts = pointsRef.current;
       if (pts.length && pts[pts.length - 1].time === t) {
-        pts[pts.length - 1].value = q.ltp;
+        pts[pts.length - 1] = { time: t, value: q.ltp };
       } else {
         pts.push({ time: t, value: q.ltp });
-        if (pts.length > 600) pts.shift();
+        if (pts.length > 1500) pts.shift();
       }
       seriesRef.current?.setData(pts);
-      chartRef.current?.timeScale().scrollToRealTime();
     });
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticker, upsertQuote]);
+  }, [ticker]);
 
   const summon = async () => {
     setBusy(true);
     try {
-      const s = await getSignal(ticker);
+      const s: OracleSignal = await getSignal(ticker);
       setSig(s);
       pushToast({
         kind: 'signal',
-        title: `⚡ ORACLE — ${s.signal_type} ${s.ticker}`,
-        body: `Conf ${(s.confidence * 100).toFixed(0)}%`,
+        title: `ORACLE — ${s.signal_type} ${s.ticker}`,
+        body: `Conf ${(s.confidence * 100).toFixed(0)}% · SL ${s.stop_loss}`,
       });
     } catch (e) {
       pushToast({ kind: 'error', title: 'ORACLE ERROR', body: (e as Error).message });
@@ -131,38 +125,41 @@ export default function StockDetail() {
     }
   };
 
-  const ltp = quote?.ltp ?? fund?.live_price ?? null;
-  const chg = quote?.change_pct ?? null;
+  const chg = quote?.change_pct ?? 0;
+  const up = chg >= 0;
 
   return (
     <div className="space-y-4">
       {/* header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Link to="/" className="text-[11px] text-hud-faint hover:text-hud-cyan">
-            ← back to HUD
-          </Link>
-          <h1 className="text-lg font-black tracking-wider">
-            {ticker}
-            {fund?.company_name && (
-              <span className="ml-2 text-xs font-normal text-hud-faint">
-                {fund.company_name}
+      <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+        <div className="flex items-center gap-3.5">
+          <TickerIcon ticker={ticker} size="lg" />
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-extrabold tracking-tight">{ticker}</h1>
+              <span className="chip border-hud-border bg-hud-bg text-hud-dim">
+                {fund?.market_regime ?? '—'}
               </span>
-            )}
-          </h1>
+            </div>
+            <div className="text-[11px] text-hud-faint">{fund?.company_name ?? '—'}</div>
+          </div>
         </div>
-        <div className="flex items-baseline gap-3">
-          <span className="font-num text-2xl font-bold">{formatINR(ltp)}</span>
-          {chg != null && (
-            <span className={`font-num text-sm ${deltaClass(chg)}`}>
-              {formatPct(chg)}
-            </span>
-          )}
+        <div className="text-right">
+          <div className="font-num text-3xl font-extrabold tracking-tight">
+            {formatINR(quote?.ltp ?? fund?.live_price)}
+          </div>
+          <div
+            className={`font-num mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${
+              up ? 'bg-hud-bull/10 text-hud-bull' : 'bg-hud-bear/10 text-hud-bear'
+            }`}
+          >
+            {up ? '▲' : '▼'} {formatPct(chg)} ({formatNum(quote?.change)})
+          </div>
         </div>
-      </div>
+      </section>
 
       {err && (
-        <div className="rounded border border-hud-bear/40 bg-hud-bear/10 px-3 py-2 text-[11px] text-hud-bear">
+        <div className="rounded-2xl border border-hud-bear/40 bg-hud-bear/10 px-3.5 py-2.5 text-[11px] font-medium text-hud-bear">
           {err}
         </div>
       )}
@@ -171,7 +168,7 @@ export default function StockDetail() {
         {/* chart */}
         <section className="panel lg:col-span-2">
           <div className="panel-head">
-            <span>◈ Intraday · Live Session</span>
+            <span>Intraday · Live Session</span>
             <span className="text-hud-faint">{pointsRef.current.length} ticks</span>
           </div>
           <div ref={chartEl} className="h-[300px] w-full p-2" />
@@ -180,8 +177,8 @@ export default function StockDetail() {
         {/* fundamentals */}
         <section className="panel">
           <div className="panel-head">
-            <span>⌬ Fundamentals</span>
-            <span className="chip border-hud-warn/40 text-hud-warn">
+            <span>Fundamentals</span>
+            <span className="chip border-hud-warn/40 bg-hud-warn/10 text-hud-warn">
               {fund?.market_regime ?? '—'}
             </span>
           </div>
@@ -196,36 +193,34 @@ export default function StockDetail() {
               ['52W High', fund ? formatNum(fund.fifty_two_week_high) : '—'],
               ['52W Low', fund ? formatNum(fund.fifty_two_week_low) : '—'],
             ].map(([k, v]) => (
-              <div key={k} className="flex justify-between border-b border-hud-border/50 pb-1.5">
+              <div key={k} className="flex justify-between rounded-lg bg-hud-bg px-2 py-1.5">
                 <span className="text-hud-faint">{k}</span>
-                <span className="font-num">{v}</span>
+                <span className="font-num font-semibold">{v}</span>
               </div>
             ))}
           </div>
           <div className="border-t border-hud-border p-4">
-            <div className="mb-1 flex justify-between text-[10px] uppercase tracking-widest">
+            <div className="mb-1 flex justify-between text-[10px] font-bold uppercase tracking-wider">
               <span className="text-hud-faint">Whale score</span>
               <span className="text-hud-cyan">
                 {(fund?.whale_activity_score ?? 0).toFixed(1)}/10
               </span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded bg-hud-border">
+            <div className="h-2 overflow-hidden rounded-full bg-hud-mint">
               <div
-                className="h-full bg-hud-cyan"
-                style={{
-                  width: `${Math.min(100, (fund?.whale_activity_score ?? 0) * 10)}%`,
-                }}
+                className="h-full rounded-full bg-hud-cyan"
+                style={{ width: `${Math.min(100, (fund?.whale_activity_score ?? 0) * 10)}%` }}
               />
             </div>
-            <div className="mb-1 mt-3 flex justify-between text-[10px] uppercase tracking-widest">
+            <div className="mb-1 mt-3 flex justify-between text-[10px] font-bold uppercase tracking-wider">
               <span className="text-hud-faint">Momentum</span>
               <span className="text-hud-bull">
                 {(fund?.momentum_score ?? 0).toFixed(1)}/10
               </span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded bg-hud-border">
+            <div className="h-2 overflow-hidden rounded-full bg-hud-mint">
               <div
-                className="h-full bg-hud-bull"
+                className="h-full rounded-full bg-hud-bull"
                 style={{ width: `${Math.min(100, (fund?.momentum_score ?? 0) * 10)}%` }}
               />
             </div>
@@ -236,17 +231,20 @@ export default function StockDetail() {
       {/* oracle */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold uppercase tracking-[0.25em] text-hud-cyan">
+          <h2 className="text-sm font-extrabold tracking-tight text-hud-text">
             ⚡ Oracle Signal
           </h2>
           <button className="btn btn-primary" onClick={summon} disabled={busy}>
-            {busy ? '⌁ THINKING…' : '⚡ SUMMON SIGNAL'}
+            {busy ? 'Thinking…' : '⚡ Summon Signal'}
           </button>
         </div>
         {sig && <SignalCard sig={sig} />}
         {!sig && (
-          <div className="panel p-5 text-center text-[11px] text-hud-faint">
-            No signal generated for {ticker} this session.
+          <div className="panel p-6 text-center text-[11px] text-hud-faint">
+            No signal generated for {ticker} this session.{' '}
+            <Link to="/oracle" className="text-hud-cyan hover:underline">
+              Open Oracle →
+            </Link>
           </div>
         )}
       </section>
