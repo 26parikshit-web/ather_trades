@@ -1,13 +1,11 @@
 -- ═══════════════════════════════════════════════════════════════
---  AETHER — Complete Supabase PostgreSQL Schema
---  Run this in your Supabase SQL Editor (in order)
+--  AETHER — Supabase migration (linked project lbsxhmffqorkgwyxghqw)
+--  Applied via: supabase db push
 -- ═══════════════════════════════════════════════════════════════
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS "vector";          -- pgvector for Oracle AI search
-CREATE EXTENSION IF NOT EXISTS "pg_cron";         -- for scheduled DB jobs
-
+CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- ═══════════════════════════════════════════════════════════════
 --  TABLE 1: PROFILES (Users & Subscription Tiers)

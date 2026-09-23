@@ -46,14 +46,49 @@ interface GeminiOptions {
 // so request a floor of 1024 output tokens to leave room for the answer.
 const MIN_OUTPUT_TOKENS = 1024;
 
+// Free-tier models are frequently overloaded (HTTP 503). We retry with
+// backoff and fall through a chain of free flash models.
+const MODEL_CHAIN: string[] = Array.from(
+  new Set([
+    GEMINI_MODEL,
+    'gemini-flash-latest',
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash',
+    'gemini-3.8-flash',
+  ])
+);
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+
+async function callGemini(
+  model: string,
+  body: Record<string, unknown>
+): Promise<string> {
+  const response = await axios.post(
+    `${GEMINI_BASE}/models/${model}:generateContent`,
+    body,
+    {
+      params: { key: GEMINI_API_KEY },
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 45_000,
+    }
+  );
+
+  const parts: Array<{ text?: string }> =
+    response.data?.candidates?.[0]?.content?.parts ?? [];
+  // Gemini 3.x appends thoughtSignature parts — concatenate only text parts
+  return parts
+    .map((p) => p.text || '')
+    .join('')
+    .trim();
+}
+
 export async function geminiGenerate(
   systemPrompt: string,
   userPrompt: string,
   opts: GeminiOptions = {}
 ): Promise<string> {
   const { temperature = 0.3, maxTokens = 800, json = false } = opts;
-
-  await throttle();
 
   const body: Record<string, unknown> = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -65,23 +100,36 @@ export async function geminiGenerate(
     },
   };
 
-  const response = await axios.post(
-    `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent`,
-    body,
-    {
-      params: { key: GEMINI_API_KEY },
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 30_000,
-    }
-  );
+  let lastErr: unknown = null;
 
-  const parts: Array<{ text?: string }> =
-    response.data?.candidates?.[0]?.content?.parts ?? [];
-  // Gemini 3.x appends thoughtSignature parts — concatenate only text parts
-  return parts
-    .map((p) => p.text || '')
-    .join('')
-    .trim();
+  for (let m = 0; m < MODEL_CHAIN.length; m++) {
+    const model = MODEL_CHAIN[m];
+    const attempts = m === 0 ? 3 : 1; // retry the preferred model, then fail over
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      await throttle();
+      try {
+        const text = await callGemini(model, body);
+        if (text) return text;
+        lastErr = new Error('Empty response from Gemini');
+      } catch (err) {
+        lastErr = err;
+        const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+        if (status && !RETRYABLE_STATUS.has(status)) throw err;
+        if (attempt < attempts - 1) {
+          const backoff = 1_500 * Math.pow(2, attempt); // 1.5s, 3s
+          log.warn(`Gemini ${model} unavailable (${status ?? 'network'}) — retrying in ${backoff}ms`);
+          await new Promise((r) => setTimeout(r, backoff));
+        }
+      }
+    }
+
+    if (m < MODEL_CHAIN.length - 1) {
+      log.warn(`Switching to fallback Gemini model: ${MODEL_CHAIN[m + 1]}`);
+    }
+  }
+
+  throw lastErr ?? new Error('Gemini request failed');
 }
 
 // ─── JSON helper: generate + parse, tolerating markdown fences ─

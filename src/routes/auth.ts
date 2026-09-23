@@ -30,6 +30,16 @@ router.post('/signup', async (req: Request, res: Response) => {
       { id: data.user.id, email, name: name || null },
       { onConflict: 'id' }
     );
+
+    // Auto-confirm the email so users can log in immediately.
+    // (Supabase requires email confirmation by default — for this
+    //  free/dev setup we confirm via the admin API instead of SMTP.)
+    if (!data.user.email_confirmed_at) {
+      await supabaseAdmin.auth.admin.updateUserById(data.user.id, {
+        email_confirm: true,
+      });
+    }
+
     const token = signToken({ id: data.user.id, email, name, tier: 'BASIC' });
     res.json({ success: true, data: { user_id: data.user.id, token } });
   } catch (err) {

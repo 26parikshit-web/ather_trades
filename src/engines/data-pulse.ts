@@ -38,65 +38,133 @@ const rapidClient = axios.create({
   timeout: 8_000,
 });
 
+// ─── Yahoo Finance client (free, no API key — NSE/BSE fallback) ─
+const yahooClient = axios.create({
+  baseURL: 'https://query1.finance.yahoo.com',
+  headers: {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+    'Accept': 'application/json',
+  },
+  timeout: 10_000,
+});
+
+// Yahoo uses suffixed symbols: RELIANCE.NS (NSE), RELIANCE.BO (BSE)
+function toYahooSymbol(ticker: string): string {
+  if (ticker.includes('.')) return ticker;
+  if (ticker === 'NIFTY50' || ticker === 'NIFTY') return '^NSEI';
+  if (ticker === 'BANKNIFTY') return '^NSEBANK';
+  if (ticker === 'SENSEX') return '^BSESN';
+  return `${ticker}.NS`;
+}
+
+async function fetchYahooQuote(ticker: string): Promise<LiveQuote | null> {
+  const symbol = toYahooSymbol(ticker);
+  const r = await yahooClient.get('/v8/finance/chart/' + symbol, {
+    params: { interval: '1d', range: '1d' },
+  });
+
+  const meta = r.data?.chart?.result?.[0]?.meta;
+  if (!meta?.regularMarketPrice) return null;
+
+  const ltp = meta.regularMarketPrice as number;
+  const prevClose = (meta.chartPreviousClose ?? meta.previousClose ?? ltp) as number;
+
+  return {
+    ticker,
+    ltp,
+    change: parseFloat((ltp - prevClose).toFixed(2)),
+    change_pct: prevClose ? parseFloat((((ltp - prevClose) / prevClose) * 100).toFixed(2)) : 0,
+    volume: meta.regularMarketVolume ?? 0,
+    bid: meta.bid ?? 0,
+    ask: meta.ask ?? 0,
+    open: meta.regularMarketOpen ?? 0,
+    high: meta.regularMarketDayHigh ?? 0,
+    low: meta.regularMarketDayLow ?? 0,
+    prev_close: prevClose,
+    timestamp: Date.now(),
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  LIVE QUOTE FETCHER
+//  Order: NSE official → RapidAPI (if key) → Yahoo Finance (free)
 // ═══════════════════════════════════════════════════════════════
 export async function fetchLiveQuote(ticker: string): Promise<LiveQuote | null> {
   const cacheKey = `quote:${ticker}`;
   const cached = await cache.get<LiveQuote>(cacheKey);
   if (cached) return cached;
 
+  // ── Provider 1: NSE official API ──────────────────────────
+  // NSE blocks non-Indian/datacenter IPs (403), so failures are normal.
   try {
-    // Primary: NSE official API
     const response = await nseClient.get(`/api/quote-equity?symbol=${ticker}`);
     const d = response.data;
-    const quote: LiveQuote = {
-      ticker,
-      ltp: d.priceInfo?.lastPrice ?? 0,
-      change: d.priceInfo?.change ?? 0,
-      change_pct: d.priceInfo?.pChange ?? 0,
-      volume: d.tradeInfo?.totalTradedVolume ?? 0,
-      bid: d.priceInfo?.intraDayHighLow?.min ?? 0,
-      ask: d.priceInfo?.intraDayHighLow?.max ?? 0,
-      open: d.priceInfo?.open ?? 0,
-      high: d.priceInfo?.intraDayHighLow?.max ?? 0,
-      low: d.priceInfo?.intraDayHighLow?.min ?? 0,
-      prev_close: d.priceInfo?.previousClose ?? 0,
-      timestamp: Date.now(),
-    };
+    if (d?.priceInfo?.lastPrice) {
+      const quote: LiveQuote = {
+        ticker,
+        ltp: d.priceInfo.lastPrice,
+        change: d.priceInfo.change ?? 0,
+        change_pct: d.priceInfo.pChange ?? 0,
+        volume: d.tradeInfo?.totalTradedVolume ?? 0,
+        bid: d.priceInfo.intraDayHighLow?.min ?? 0,
+        ask: d.priceInfo.intraDayHighLow?.max ?? 0,
+        open: d.priceInfo.open ?? 0,
+        high: d.priceInfo.intraDayHighLow?.max ?? 0,
+        low: d.priceInfo.intraDayHighLow?.min ?? 0,
+        prev_close: d.priceInfo.previousClose ?? 0,
+        timestamp: Date.now(),
+      };
 
-    await cache.set(cacheKey, quote, TTL.LIVE_QUOTE);
-    return quote;
-  } catch (primaryErr) {
-    log.warn(`NSE primary failed for ${ticker}, trying RapidAPI fallback`);
+      await cache.set(cacheKey, quote, TTL.LIVE_QUOTE);
+      return quote;
+    }
+  } catch {
+    // Expected from non-Indian IPs — fall through to free providers
+    log.debug(`NSE quote unavailable for ${ticker}, using fallback`);
   }
 
+  // ── Provider 2: RapidAPI (optional, only if key configured) ─
+  if (process.env.NSE_RAPIDAPI_KEY) {
+    try {
+      const r = await rapidClient.get('/price', { params: { Indices: ticker } });
+      const d = r.data?.[0];
+      if (d?.lastPrice) {
+        const quote: LiveQuote = {
+          ticker,
+          ltp: parseFloat(d.lastPrice?.replace(',', '') || '0'),
+          change: parseFloat(d.change || '0'),
+          change_pct: parseFloat(d.pChange || '0'),
+          volume: parseInt(d.totalTradedVolume?.replace(',', '') || '0', 10),
+          bid: 0, ask: 0,
+          open: parseFloat(d.open?.replace(',', '') || '0'),
+          high: parseFloat(d.dayHigh?.replace(',', '') || '0'),
+          low: parseFloat(d.dayLow?.replace(',', '') || '0'),
+          prev_close: parseFloat(d.previousClose?.replace(',', '') || '0'),
+          timestamp: Date.now(),
+        };
+
+        await cache.set(cacheKey, quote, TTL.LIVE_QUOTE);
+        return quote;
+      }
+    } catch (err) {
+      log.debug(`RapidAPI quote unavailable for ${ticker}`, { err: String(err) });
+    }
+  }
+
+  // ── Provider 3: Yahoo Finance (free, no key) ───────────────
   try {
-    // Fallback: RapidAPI stock price
-    const r = await rapidClient.get('/price', { params: { Indices: ticker } });
-    const d = r.data?.[0];
-    if (!d) return null;
-
-    const quote: LiveQuote = {
-      ticker,
-      ltp: parseFloat(d.lastPrice?.replace(',', '') || '0'),
-      change: parseFloat(d.change || '0'),
-      change_pct: parseFloat(d.pChange || '0'),
-      volume: parseInt(d.totalTradedVolume?.replace(',', '') || '0', 10),
-      bid: 0, ask: 0,
-      open: parseFloat(d.open?.replace(',', '') || '0'),
-      high: parseFloat(d.dayHigh?.replace(',', '') || '0'),
-      low: parseFloat(d.dayLow?.replace(',', '') || '0'),
-      prev_close: parseFloat(d.previousClose?.replace(',', '') || '0'),
-      timestamp: Date.now(),
-    };
-
-    await cache.set(cacheKey, quote, TTL.LIVE_QUOTE);
-    return quote;
+    const quote = await fetchYahooQuote(ticker);
+    if (quote) {
+      await cache.set(cacheKey, quote, TTL.LIVE_QUOTE);
+      return quote;
+    }
   } catch (err) {
-    log.error(`All quote sources failed for ${ticker}`, { err });
-    return null;
+    log.warn(`Yahoo quote failed for ${ticker}`, { err: String(err) });
   }
+
+  log.error(`All quote sources failed for ${ticker}`);
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -306,12 +374,17 @@ export async function fetchBulkQuotes(tickers: string[]): Promise<LiveQuote[]> {
         wsServer.broadcastQuote(q.ticker, q);
       }
     }
-    return results;
+    if (results.length > 0) return results;
+    log.debug('NSE bulk endpoint returned no matching tickers — using fallback');
   } catch (err) {
-    log.error('Bulk quote fetch failed', { err });
-    // Fallback to individual
-    return Promise.all(tickers.map((t) => fetchLiveQuote(t))).then((r) => r.filter(Boolean) as LiveQuote[]);
+    log.debug('NSE bulk quote fetch unavailable — using fallback', { err: String(err) });
   }
+
+  // Fallback: individual quotes (NSE → RapidAPI → Yahoo, free)
+  const quotes = await Promise.all(tickers.map((t) => fetchLiveQuote(t)));
+  const clean = quotes.filter(Boolean) as LiveQuote[];
+  for (const q of clean) wsServer.broadcastQuote(q.ticker, q);
+  return clean;
 }
 
 // ═══════════════════════════════════════════════════════════════

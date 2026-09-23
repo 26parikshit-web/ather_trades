@@ -20,6 +20,16 @@ const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 let client: RedisClientType | null = null;
 let connecting: Promise<RedisClientType> | null = null;
 
+// ─── Circuit breaker ─────────────────────────────────────────
+// If Redis is unreachable we stop retrying for a cooldown window so
+// cache calls return instantly instead of waiting on a 5s timeout.
+const COOLDOWN_MS = 60_000;
+let redisDownUntil = 0;
+
+function isRedisDown(): boolean {
+  return Date.now() < redisDownUntil;
+}
+
 // ─── Singleton connection ────────────────────────────────────
 // Fails fast (5s) so boot never hangs when Redis is down —
 // the cache wrapper degrades gracefully to miss/no-op.
@@ -27,6 +37,7 @@ const CONNECT_TIMEOUT_MS = 5_000;
 
 export async function getRedis(): Promise<RedisClientType> {
   if (client?.isReady) return client;
+  if (isRedisDown()) throw new Error('Redis marked unavailable (cooldown)');
   if (connecting) return connecting;
 
   connecting = (async () => {
@@ -41,6 +52,7 @@ export async function getRedis(): Promise<RedisClientType> {
         ),
       ]);
     } catch (err) {
+      redisDownUntil = Date.now() + COOLDOWN_MS;
       try {
         await c.disconnect();
       } catch {

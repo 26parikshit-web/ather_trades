@@ -24,8 +24,9 @@ router.get('/stats', (_req: Request, res: Response) => {
       uptime_seconds: Math.round(process.uptime()),
       memory_mb: Math.round(process.memoryUsage().rss / 1024 / 1024),
       free_mode: true,
-      ai_provider: 'gemini-1.5-flash',
-      embeddings_provider: 'huggingface',
+      ai_provider: `gemini (${process.env.GEMINI_MODEL || 'gemini-3.6-flash'})`,
+      embeddings_provider: `huggingface (${process.env.HF_EMBEDDING_MODEL || 'all-MiniLM-L6-v2'})`,
+      market_data: 'NSE → RapidAPI → Yahoo Finance (free chain)',
       social_posting: 'disabled',
     },
   });

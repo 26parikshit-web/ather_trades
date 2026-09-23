@@ -1,10 +1,129 @@
 # ⚡ AETHER Backend — Tactical Market Intelligence
 
 > **Micro-Engine Architecture** | Node.js + TypeScript + Python + Supabase + Redis
+> **100% free-tier stack** — Gemini + HuggingFace instead of OpenAI, no paid video APIs
+
+---
+
+## 💸 Free Tier Stack (verified working)
+
+| Capability | Provider | Cost |
+|---|---|---|
+| AI reasoning (signals, news sentiment, captions) | **Google Gemini** (`gemini-3.6-flash` + auto-fallback chain) | Free |
+| AI embeddings (pgvector similarity) | **HuggingFace** Inference Providers (`all-MiniLM-L6-v2`, 384-dim) | Free |
+| Database + Auth + RLS + pgvector | **Supabase** free tier | Free |
+| Live market data | **NSE official → RapidAPI (optional) → Yahoo Finance** | Free |
+| Cache | **Redis** (local Docker) — optional, degrades gracefully | Free |
+| Technical indicators / regime / portfolio math | Local **Python FastAPI** | Free |
+| Social posting (Reels/YouTube) | ⛔ **Disabled** (Shotstack paid API removed — captions still generated) | — |
+
+---
+
+## ✅ Verified End-to-End (live smoke test)
+
+Every route tested against the live Supabase project, real NSE/Yahoo data, and real Gemini calls:
+
+```
+PASS | signup                          PASS | news analyze (real Gemini)
+PASS | login                           PASS | portfolio AI review
+PASS | me (profile)                   PASS | admin stats (ELITE)
+PASS | index (Nifty 23446.8)           PASS | portfolio add
+PASS | quote RELIANCE (₹1248, +0.61%)  PASS | portfolio list
+PASS | fundamentals (PE 12.67)         PASS | portfolio remove
+PASS | news feed                       PASS | broadcast signal (free mode)
+PASS | admin gate → 403                PASS | broadcast logs
+PASS | oracle gate → 403               PASS | oracle signal (real Gemini: TCS WATCH 45%)
+```
+
+Run it yourself: `npx tsx scripts/smoke-test.ts` (Node API must be running)
 
 ---
 
 ## 🏗️ Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     AETHER BACKEND                          │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
+│  │  DATA PULSE  │  │ ORACLE BRAIN │  │  CHRONOS NEWS    │  │
+│  │ NSE→Yahoo    │  │ GEMINI AI    │  │  RSS + GEMINI    │  │
+│  │  Live Quotes │  │  Signals     │  │  Sentiment       │  │
+│  └──────┬───────┘  └──────┬───────┘  └───────┬──────────┘  │
+│         │                 │                   │             │
+│         └─────────────────┼───────────────────┘             │
+│                           │                                 │
+│                    ┌──────▼───────┐                         │
+│                    │  WebSocket   │  ← Real-time HUD Feed   │
+│                    │  Server /ws  │                         │
+│                    └──────┬───────┘                         │
+│                           │                                 │
+│  ┌──────────────┐  ┌──────▼───────┐  ┌──────────────────┐  │
+│  │ PULSE STUDIO │  │  Express API │  │  Python AI       │  │
+│  │ captions only│  │  REST Routes │  │  ML Indicators   │  │
+│  │ (free mode)  │  │  + Auth/JWT  │  │  FastAPI :8000   │  │
+│  └──────────────┘  └──────────────┘  └──────────────────┘  │
+│                                                             │
+│  ┌──────────────────┐     ┌───────────────────────────────┐ │
+│  │  Supabase        │     │  Redis Cache                  │ │
+│  │  PostgreSQL+RLS  │     │  TTL: 3s quotes, 5m fundas    │ │
+│  │  pgvector(384)   │     │  (optional — circuit breaker) │ │
+│  └──────────────────┘     └───────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Install
+```bash
+npm install
+```
+
+### 2. Environment
+```bash
+cp .env.example .env   # then fill in the keys below
+```
+
+### 3. Free API Keys
+| Key | Where to get it |
+|---|---|
+| `GEMINI_API_KEY` | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| `HUGGINGFACE_API_KEY` | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (needs "Inference Providers" permission) |
+| `SUPABASE_URL` / `SUPABASE_KEY` / `SUPABASE_SERVICE_KEY` | Supabase → Settings → API (**use the legacy `anon` + `service_role` JWT keys**) |
+
+### 4. Database (Supabase CLI — recommended)
+```bash
+supabase link --project-ref YOUR_PROJECT_REF
+supabase db push        # applies supabase/migrations/*.sql
+```
+Or paste `supabase/schema.sql` into the Supabase SQL Editor.
+
+> **Post-setup:** disable email confirmation for dev — Dashboard → Authentication → Sign In / Providers → Email → turn **off** "Confirm email" (or the API auto-confirms on signup via the admin client).
+
+### 5. Run
+```bash
+# Terminal 1 — Node API
+npm run dev
+
+# Terminal 2 — Python AI
+cd python-ai && pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+
+# Optional — Redis cache
+docker run -d -p 6379:6379 redis:7-alpine
+```
+
+### 6. Verify
+```bash
+npx tsx scripts/smoke-test.ts
+```
+
+### 7. Docker (production)
+```bash
+docker-compose up --build
+```
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -39,120 +158,73 @@
 
 ---
 
-## 🚀 Quick Start
+## 🔑 Optional / Paid Integrations (all removed in free mode)
 
-### 1. Clone & Install
-```bash
-cd aether-backend
-npm install
-```
+These are **not required** and are disabled by default:
 
-### 2. Environment Setup
-```bash
-cp .env.example .env
-# Fill in your keys — see KEY SETUP below
-```
-
-### 3. Database Setup
-- Go to your Supabase project → SQL Editor
-- Paste and run the entire contents of `supabase/schema.sql`
-
-### 4. Run (Development)
-```bash
-# Terminal 1: Node.js API
-npm run dev
-
-# Terminal 2: Python AI Service
-cd python-ai
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-```
-
-### 5. Run (Docker — Production)
-```bash
-docker-compose up --build
-```
-
----
-
-## 🔑 Key Setup Guide
-
-### Supabase
-1. Create project at [supabase.com](https://supabase.com)
-2. Copy `SUPABASE_URL` and `SUPABASE_KEY` (anon) from Settings → API
-3. Copy `SUPABASE_SERVICE_KEY` (service_role) — keep secret!
-
-### OpenAI
-1. Get key at [platform.openai.com](https://platform.openai.com)
-2. Set `OPENAI_API_KEY=sk-...`
-3. Default model: `gpt-4-turbo`
-
-### NSE Market Data (RapidAPI)
-1. Sign up at [rapidapi.com](https://rapidapi.com)
-2. Subscribe to **"Latest Stock Price"** API (free tier available)
-3. Set `NSE_RAPIDAPI_KEY` and `NSE_RAPIDAPI_HOST`
-
-### Instagram (Meta Graph API)
-1. Create Meta Developer App at [developers.facebook.com](https://developers.facebook.com)
-2. Add Instagram Basic Display API
-3. Get long-lived access token and IG User ID
-4. Set `INSTAGRAM_ACCESS_TOKEN` and `INSTAGRAM_USER_ID`
-
-### Shotstack (Video Rendering)
-1. Sign up at [shotstack.io](https://shotstack.io)
-2. Set `SHOTSTACK_API_KEY` and `SHOTSTACK_ENV=stage` (test) or `production`
-
-### YouTube Data API
-1. Create project in Google Cloud Console
-2. Enable YouTube Data API v3
-3. Set `YOUTUBE_API_KEY`
+| Integration | Status | Notes |
+|---|---|---|
+| OpenAI (GPT-4) | ❌ Removed | Replaced by Gemini (free) |
+| Shotstack (video rendering) | ❌ Removed | Paid. Pulse Studio now generates text signal cards |
+| Instagram Graph API | ⏸️ Stubbed | Free but needs Meta app review; `instagram_status = 'DISABLED'` |
+| YouTube Data API | ⏸️ Stubbed | Free quota exists; upload code removed for now |
+| RapidAPI NSE | ➕ Optional | Free tier available; app falls back to Yahoo Finance without it |
 
 ---
 
 ## 📡 API Reference
 
-### Auth
+All responses use the envelope `{ "success": true, "data": ... }` or `{ "success": false, "error": "..." }`.
+Auth = `Authorization: Bearer <JWT>` header.
+
+### Auth — `/api/auth`
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/auth/signup` | — | Register (auto-confirms email, returns JWT) |
+| POST | `/api/auth/login` | — | Login, returns JWT + tier |
+| GET | `/api/auth/me` | ✅ | Current profile + subscription tier |
+
+### Stocks — `/api/stocks`
+| Method | Endpoint | Tier | Description |
+|--------|----------|------|-------------|
+| GET | `/index` | ALL | Nifty 50 / Bank Nifty / Sensex pulse |
+| GET | `/quote/:ticker` | ALL | Live quote (NSE → RapidAPI → Yahoo) |
+| GET | `/fundamentals/:ticker` | ALL | PE, PB, ROI, regime, whale score |
+| POST | `/bulk` | ALL | Bulk quotes, body `{ tickers: [] }` (max 50) |
+| GET | `/signal/:ticker` | PRO+ | Oracle AI signal (Gemini) |
+| GET | `/hover/:ticker` | PRO+ | 2-sentence AI insight |
+| GET | `/similar/:ticker?context=` | PRO+ | pgvector similarity search (HuggingFace embeddings) |
+
+### News — `/api/news`
+| Method | Endpoint | Tier | Description |
+|--------|----------|------|-------------|
+| GET | `/?limit=&category=&minImpact=` | ALL | Latest analyzed headlines |
+| POST | `/analyze` | ALL | Analyze a custom headline (Gemini) |
+| POST | `/scan` | ALL | Trigger RSS + NSE announcement scan |
+
+### Portfolio — `/api/portfolio`
+| Method | Endpoint | Tier | Description |
+|--------|----------|------|-------------|
+| GET | `/` | PRO+ | Holdings + live P&L summary |
+| POST | `/` | PRO+ | Add/update holding (upsert) |
+| DELETE | `/holding/:ticker` | PRO+ | Remove holding |
+| GET | `/ai-review` | ELITE | AI rebalancing review (Gemini) |
+
+### Broadcast (Pulse Studio — free mode) — `/api/broadcast`
+| Method | Endpoint | Tier | Description |
+|--------|----------|------|-------------|
+| POST | `/signal` | ELITE | Generate caption + signal card (logged, not posted) |
+| POST | `/daily-recap` | ELITE | Trigger daily recap now |
+| GET | `/logs?limit=` | ELITE | Broadcast history |
+
+### Admin — `/api/admin` (all ELITE)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/register` | Register + get JWT |
-| POST | `/api/auth/login` | Login + get JWT |
-| GET | `/api/auth/me` | Get current user |
-| POST | `/api/auth/logout` | Logout |
-
-### Stocks (All require JWT)
-| Method | Endpoint | Tier | Description |
-|--------|----------|------|-------------|
-| GET | `/api/stocks/index` | ALL | Nifty, Sensex, BankNifty |
-| GET | `/api/stocks/:ticker/quote` | ALL | Live price quote |
-| GET | `/api/stocks/:ticker/fundamentals` | ALL | PE, PB, regime |
-| GET | `/api/stocks/:ticker/signal` | PRO+ | Oracle AI signal |
-| GET | `/api/stocks/:ticker/hover` | PRO+ | 2-sentence AI insight |
-| GET | `/api/stocks/:ticker/similar` | ELITE | Vector similarity |
-| GET | `/api/stocks/signals/latest` | PRO+ | All recent signals |
-| GET | `/api/stocks/screener` | ELITE | Filter by PE/PB/whale |
-| POST | `/api/stocks/bulk-quotes` | ALL | Up to 50 tickers |
-
-### News
-| Method | Endpoint | Tier | Description |
-|--------|----------|------|-------------|
-| GET | `/api/news/feed` | ALL | Latest analyzed news |
-| POST | `/api/news/analyze` | PRO+ | Analyze custom headline |
-| POST | `/api/news/scan` | ELITE | Trigger full news scan |
-
-### Portfolio
-| Method | Endpoint | Tier | Description |
-|--------|----------|------|-------------|
-| GET | `/api/portfolio` | ALL | Get holdings + P&L |
-| POST | `/api/portfolio/holding` | PRO+ | Add holding |
-| DELETE | `/api/portfolio/holding/:ticker` | PRO+ | Remove holding |
-| GET | `/api/portfolio/ai-review` | ELITE | AI portfolio review |
-
-### Broadcast (Pulse Studio)
-| Method | Endpoint | Tier | Description |
-|--------|----------|------|-------------|
-| POST | `/api/broadcast/signal` | ELITE | Post signal to IG + YT |
-| POST | `/api/broadcast/daily-recap` | ELITE | Trigger daily recap |
-| GET | `/api/broadcast/logs` | ELITE | Broadcast history |
+| GET | `/stats` | WS clients, uptime, memory, provider info |
+| POST | `/scan/signals` | Batch Oracle scan, body `{ tickers: [] }` (max 20) |
+| POST | `/scan/news` | Manual news scan |
+| POST | `/broadcast/recap` | Trigger daily recap |
+| POST | `/cache/flush` | body `{ pattern: "quote:*" }` |
 
 ---
 
@@ -215,36 +287,39 @@ All require header: `x-internal-secret: YOUR_PYTHON_AI_SECRET`
 ## 📂 Project Structure
 
 ```
-aether-backend/
+automation/                        (repo: ather_trades)
 ├── src/
 │   ├── engines/
-│   │   ├── data-pulse.ts       ← Live NSE/BSE data + WebSocket feed
-│   │   ├── oracle-brain.ts     ← GPT-4 signals + vector search
-│   │   ├── chronos-news.ts     ← News scraper + AI sentiment
-│   │   └── pulse-studio.ts     ← Instagram + YouTube automation
+│   │   ├── data-pulse.ts       ← NSE → RapidAPI → Yahoo quotes + WS feed
+│   │   ├── oracle-brain.ts     ← Gemini signals + HF vector search
+│   │   ├── chronos-news.ts     ← RSS/NSE scraper + Gemini sentiment
+│   │   └── pulse-studio.ts     ← Free mode: captions + signal cards
 │   ├── routes/
-│   │   ├── auth.ts             ← JWT auth endpoints
-│   │   ├── stocks.ts           ← Market data + signals
-│   │   ├── portfolio.ts        ← Holdings + P&L
+│   │   ├── auth.ts             ← Signup/login (auto email-confirm) + JWT
+│   │   ├── stocks.ts           ← Quotes, fundamentals, signals, hover
+│   │   ├── portfolio.ts        ← Holdings + live P&L
 │   │   ├── news.ts             ← News feed + analysis
-│   │   ├── broadcast.ts        ← Pulse Studio API
-│   │   └── admin.ts            ← System management
+│   │   ├── broadcast.ts        ← Pulse Studio API (free mode)
+│   │   └── admin.ts            ← System management + manual scans
 │   ├── lib/
+│   │   ├── ai.ts               ← Gemini (retry + model fallback) + HF embeddings
 │   │   ├── supabase.ts         ← DB client (public + admin)
-│   │   ├── websocket.ts        ← WS server + subscriptions
-│   │   ├── cache.ts            ← Redis with TTL constants
+│   │   ├── websocket.ts        ← WS server + tier-gated subscriptions
+│   │   ├── cache.ts            ← Redis with TTL + circuit breaker
 │   │   └── logger.ts           ← Winston structured logging
-│   ├── middleware/
-│   │   └── auth.ts             ← JWT verify + tier gates
-│   ├── types/
-│   │   └── index.ts            ← All shared TypeScript types
+│   ├── middleware/auth.ts      ← JWT verify + tier gates
+│   ├── types/index.ts          ← All shared TypeScript types
 │   └── server.ts               ← Entry point + bootstrap
+├── scripts/
+│   └── smoke-test.ts           ← 18-check end-to-end verification
 ├── supabase/
-│   ├── schema.sql              ← Full DB schema + seed data
-│   └── functions/
-│       └── live-quote/         ← Edge function (ultra-low latency)
+│   ├── schema.sql              ← Full schema + seed (SQL Editor paste-in)
+│   ├── migrations/             ← CLI migrations (supabase db push)
+│   │   ├── 20260924000000_aether_schema.sql
+│   │   └── 20260924010000_fix_handle_new_user.sql
+│   └── functions/live-quote/   ← Edge function (Deno)
 ├── python-ai/
-│   ├── main.py                 ← FastAPI ML service
+│   ├── main.py                 ← FastAPI indicators/regime/portfolio/sentiment
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── docker-compose.yml
@@ -252,3 +327,16 @@ aether-backend/
 ├── .env.example
 └── tsconfig.json
 ```
+
+---
+
+## 🧠 Notable Implementation Details
+
+- **Gemini resilience** — free-tier models return 503 under load. `src/lib/ai.ts` retries with exponential backoff, then fails over through a model chain (`gemini-3.6-flash → gemini-flash-latest → gemini-flash-lite-latest → gemini-3.5-flash → gemini-3.8-flash`). A global throttle keeps usage under the free quota.
+- **Gemini 3.x quirks** — "thinking" tokens count against `maxOutputTokens` (we floor requests at 1024) and responses include `thoughtSignature` parts (we concatenate text parts only).
+- **Supabase keys** — the new `sb_publishable_` / `sb_secret_` keys are not accepted by `supabase-js` v2 for REST/RLS work; use the legacy `anon` + `service_role` JWT keys.
+- **`handle_new_user()` trigger** — must declare `SET search_path = public`, otherwise GoTrue's role fails with "Database error saving new user".
+- **NSE blocking** — `quote-equity` returns 403 from non-Indian IPs; Yahoo Finance is the free fallback. `/api/allIndices` still works directly.
+- **Redis is optional** — a circuit breaker marks Redis unavailable for 60s after a failed connect so requests never wait on the 5s timeout.
+- **Embeddings are 384-dim** (`all-MiniLM-L6-v2`) — schema uses `vector(384)`, not OpenAI's 1536.
+

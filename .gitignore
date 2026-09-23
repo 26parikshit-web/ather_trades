@@ -6,3 +6,6 @@ logs/
 __pycache__/
 .venv/
 .DS_Store
+supabase-cli/
+supabase/.temp/
+supabase-cli.zip
