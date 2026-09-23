@@ -1,0 +1,65 @@
+version: '3.9'
+
+services:
+  # ── Node.js AETHER Backend ───────────────────────────────────
+  aether-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aether-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      python-ai:
+        condition: service_started
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - aether-net
+
+  # ── Python AI Microservice ───────────────────────────────────
+  python-ai:
+    build:
+      context: ./python-ai
+      dockerfile: Dockerfile
+    container_name: aether-python-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    networks:
+      - aether-net
+
+  # ── Redis Cache ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: aether-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aether-net
+
+volumes:
+  redis_data:
+
+networks:
+  aether-net:
+    driver: bridge
